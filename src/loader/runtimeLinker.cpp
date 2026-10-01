@@ -664,6 +664,20 @@ static bool KytyExceptionHandler(const Common::HostException::ExceptionInfo& exc
 		return true;
 	}
 
+	// تخطي تعليمة int 0x41 (Sony PS5 Trap / Assert)
+	if (info->exception_address != 0 && IsReadableRange(info->exception_address, 2)) {
+		const auto* opcodes = reinterpret_cast<const uint8_t*>(info->exception_address);
+		if (opcodes[0] == 0xcd && opcodes[1] == 0x41) {
+#if KYTY_PLATFORM == KYTY_PLATFORM_WINDOWS
+			auto* ctx = reinterpret_cast<PCONTEXT>(info->native_context);
+			if (ctx != nullptr) {
+				ctx->Rip += 2; // تخطي تعليمة cd 41 لمواصلة التنفيذ
+				return true;
+			}
+#endif
+		}
+	}
+
 	if (info->type == Common::HostException::ExceptionType::AccessViolation) {
 		using CoreAccess = Common::HostException::AccessViolationType;
 		using GpuAccess  = Libs::Graphics::PageFaultAccess;
